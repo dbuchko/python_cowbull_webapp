@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik
+    command: --web \
+      --docker \
+      --docker.swarmmode \
+      --docker.domain=traefik \
+      --docker.watch \
+      --logLevel=DEBUG
+    networks:
+      - traefik-net
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev/null:/traefik.toml
+    deploy:
+      placement:
+        constraints: [node.role==manager]
+  redis:
+    image: 'redis:latest'
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 200M
+    networks:
+      - traefik-net
+  cowbull_svc:
+    image: 'dsanderscan/cowbull:1.0.172'
+    depends_on:
+      - redis
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 200M
+    environment:
+      - LOGGING_LEVEL=10
+      - 'PERSISTER={"engine_name": "redis", "parameters": {"host": "redis", "port": 6379, "db": 0}}'
+    networks:
+      - traefik-net
+  cowbull_webapp:
+    image: 'dsanderscan/cowbull_webapp:1.0.106'
+    depends_on:
+      - cowbull_svc
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 200M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.port=8080"
+        - "traefik.docker.network=traefik-net"
+        - "traefik.frontend.rule=Host:cowbull"
+    environment:
+      - COWBULL_SERVER=cowbull_svc
+      - COWBULL_PORT=8080
+      - COWBULL_VERSION=v1
+      - BUILD_NUMBER=1.0.172-COMPOSE
+      - COWBULL_ENVIRONMENT=--LOCAL--
+    networks:
+      - traefik-net
+networks:
+  traefik-net:
