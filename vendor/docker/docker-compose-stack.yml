@@ -71,7 +71,7 @@ services:
       - COWBULL_PORT=8080
       - COWBULL_VERSION=v1
       - BUILD_NUMBER=1.0.172-COMPOSE
-      - COWBULL_ENVIRONMENT=--LOCAL--
+      - COWBULL_ENVIRONMENT=docker-stack
     networks:
       - traefik-net
 networks:
